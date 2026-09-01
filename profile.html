@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}My Profile - StyleHub{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h3 class="fw-bold mb-4">My Profile</h3>
+  <div class="row">
+    <div class="col-lg-7 mb-4">
+      <div class="sh-filter-box">
+        <h5 class="fw-bold mb-3">Personal Information</h5>
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label small">First Name</label><input type="text" class="form-control" id="p-first-name"></div>
+          <div class="col-6"><label class="form-label small">Last Name</label><input type="text" class="form-control" id="p-last-name"></div>
+          <div class="col-12"><label class="form-label small">Username</label><input type="text" class="form-control" id="p-username" disabled></div>
+          <div class="col-12"><label class="form-label small">Email</label><input type="email" class="form-control" id="p-email" disabled></div>
+          <div class="col-12"><label class="form-label small">Phone</label><input type="text" class="form-control" id="p-phone"></div>
+          <div class="col-12"><label class="form-label small">Address</label><textarea class="form-control" id="p-address" rows="2"></textarea></div>
+          <div class="col-4"><label class="form-label small">City</label><input type="text" class="form-control" id="p-city"></div>
+          <div class="col-4"><label class="form-label small">State</label><input type="text" class="form-control" id="p-state"></div>
+          <div class="col-4"><label class="form-label small">ZIP</label><input type="text" class="form-control" id="p-zip"></div>
+        </div>
+        <button class="btn btn-sh-primary mt-3" id="p-save-info">Save Changes</button>
+      </div>
+    </div>
+
+    <div class="col-lg-5 mb-4">
+      <div class="sh-filter-box">
+        <h5 class="fw-bold mb-1">Body Measurements</h5>
+        <p class="small text-muted">Saved once, used automatically for size recommendations across the store.</p>
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label small">Height (cm)</label><input type="number" class="form-control" id="p-height"></div>
+          <div class="col-6"><label class="form-label small">Weight (kg)</label><input type="number" class="form-control" id="p-weight"></div>
+          <div class="col-4"><label class="form-label small">Chest (cm)</label><input type="number" class="form-control" id="p-chest"></div>
+          <div class="col-4"><label class="form-label small">Waist (cm)</label><input type="number" class="form-control" id="p-waist"></div>
+          <div class="col-4"><label class="form-label small">Hip (cm)</label><input type="number" class="form-control" id="p-hip"></div>
+          <div class="col-12">
+            <label class="form-label small">Preferred Fit</label>
+            <select class="form-select" id="p-fit">
+              <option value="regular">Regular</option>
+              <option value="slim">Slim</option>
+              <option value="loose">Loose</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-sh-primary mt-3" id="p-save-measurements">Save Measurements</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadProfile() {
+  if (!SH.requireAuthOrRedirect("/profile")) return;
+  try {
+    const me = await SH.api("/api/auth/me");
+    document.getElementById("p-first-name").value = me.first_name || "";
+    document.getElementById("p-last-name").value = me.last_name || "";
+    document.getElementById("p-username").value = me.username;
+    document.getElementById("p-email").value = me.email;
+    document.getElementById("p-phone").value = me.phone || "";
+    document.getElementById("p-address").value = me.address || "";
+    document.getElementById("p-city").value = me.city || "";
+    document.getElementById("p-state").value = me.state || "";
+    document.getElementById("p-zip").value = me.zip_code || "";
+    document.getElementById("p-height").value = me.height_cm || "";
+    document.getElementById("p-weight").value = me.weight_kg || "";
+    document.getElementById("p-chest").value = me.chest_cm || "";
+    document.getElementById("p-waist").value = me.waist_cm || "";
+    document.getElementById("p-hip").value = me.hip_cm || "";
+    document.getElementById("p-fit").value = me.preferred_fit || "regular";
+  } catch (e) {
+    SH.toast(e.message, "error");
+  }
+}
+
+document.getElementById("p-save-info").addEventListener("click", async () => {
+  try {
+    const updated = await SH.api("/api/auth/me", {
+      method: "PUT",
+      body: JSON.stringify({
+        first_name: document.getElementById("p-first-name").value.trim(),
+        last_name: document.getElementById("p-last-name").value.trim(),
+        phone: document.getElementById("p-phone").value.trim(),
+        address: document.getElementById("p-address").value.trim(),
+        city: document.getElementById("p-city").value.trim(),
+        state: document.getElementById("p-state").value.trim(),
+        zip_code: document.getElementById("p-zip").value.trim(),
+      }),
+    });
+    SH.setSession(SH.getToken(), updated);
+    SH.toast("Profile updated!");
+  } catch (e) { SH.toast(e.message, "error"); }
+});
+
+document.getElementById("p-save-measurements").addEventListener("click", async () => {
+  try {
+    const updated = await SH.api("/api/auth/me", {
+      method: "PUT",
+      body: JSON.stringify({
+        height_cm: parseFloat(document.getElementById("p-height").value) || null,
+        weight_kg: parseFloat(document.getElementById("p-weight").value) || null,
+        chest_cm: parseFloat(document.getElementById("p-chest").value) || null,
+        waist_cm: parseFloat(document.getElementById("p-waist").value) || null,
+        hip_cm: parseFloat(document.getElementById("p-hip").value) || null,
+        preferred_fit: document.getElementById("p-fit").value,
+      }),
+    });
+    SH.setSession(SH.getToken(), updated);
+    SH.toast("Measurements saved! We'll use these for size recommendations.");
+  } catch (e) { SH.toast(e.message, "error"); }
+});
+
+loadProfile();
+</script>
+{% endblock %}

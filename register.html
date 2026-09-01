@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Sign Up - StyleHub{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="sh-auth-card">
+    <h3 class="fw-bold text-center mb-1">Create Your Account</h3>
+    <p class="text-muted text-center mb-4">Join StyleHub for a personalized fashion experience</p>
+    <div id="sh-register-error" class="alert alert-danger d-none"></div>
+    <div class="row g-2">
+      <div class="col-6">
+        <label class="form-label small">First Name</label>
+        <input type="text" class="form-control" id="r-first-name">
+      </div>
+      <div class="col-6">
+        <label class="form-label small">Last Name</label>
+        <input type="text" class="form-control" id="r-last-name">
+      </div>
+      <div class="col-12">
+        <label class="form-label small">Username</label>
+        <input type="text" class="form-control" id="r-username">
+      </div>
+      <div class="col-12">
+        <label class="form-label small">Email</label>
+        <input type="email" class="form-control" id="r-email">
+      </div>
+      <div class="col-12">
+        <label class="form-label small">Phone</label>
+        <input type="text" class="form-control" id="r-phone">
+      </div>
+      <div class="col-12">
+        <label class="form-label small">Password</label>
+        <input type="password" class="form-control" id="r-password">
+        <div class="form-text">At least 6 characters.</div>
+      </div>
+    </div>
+    <button class="btn btn-sh-primary w-100 mt-3" id="r-submit">Create Account</button>
+    <p class="text-center small mt-3 mb-0">Already have an account? <a href="/login">Login</a></p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById("r-submit").addEventListener("click", async () => {
+  const errorBox = document.getElementById("sh-register-error");
+  errorBox.classList.add("d-none");
+
+  const payload = {
+    username: document.getElementById("r-username").value.trim(),
+    email: document.getElementById("r-email").value.trim(),
+    password: document.getElementById("r-password").value,
+    first_name: document.getElementById("r-first-name").value.trim(),
+    last_name: document.getElementById("r-last-name").value.trim(),
+    phone: document.getElementById("r-phone").value.trim(),
+  };
+
+  if (!payload.username || !payload.email || !payload.password) {
+    errorBox.textContent = "Please fill in username, email, and password.";
+    errorBox.classList.remove("d-none");
+    return;
+  }
+  if (payload.password.length < 6) {
+    errorBox.textContent = "Password must be at least 6 characters.";
+    errorBox.classList.remove("d-none");
+    return;
+  }
+
+  try {
+    const data = await SH.api("/api/auth/register", { method: "POST", body: JSON.stringify(payload) });
+    SH.setSession(data.access_token, data.user);
+    SH.toast("Account created! Welcome to StyleHub.");
+    window.location.href = "/";
+  } catch (e) {
+    errorBox.textContent = e.message;
+    errorBox.classList.remove("d-none");
+  }
+});
+</script>
+{% endblock %}

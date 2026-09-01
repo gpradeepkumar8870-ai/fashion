@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}My Cart - StyleHub{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h3 class="fw-bold mb-4">My Shopping Cart</h3>
+  <div class="row" id="sh-cart-root">
+    <div class="col-12 text-center py-5"><div class="spinner-border" style="color:var(--sh-primary);"></div></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadCart() {
+  if (!SH.requireAuthOrRedirect("/cart")) return;
+  const root = document.getElementById("sh-cart-root");
+  try {
+    const cart = await SH.api("/api/cart");
+    if (cart.items.length === 0) {
+      root.innerHTML = `
+        <div class="col-12 sh-empty-state">
+          <i class="bi bi-bag-x fs-1"></i>
+          <p class="mt-3">Your cart is empty.</p>
+          <a href="/products" class="btn btn-sh-primary">Start Shopping</a>
+        </div>`;
+      return;
+    }
+
+    root.innerHTML = `
+      <div class="col-lg-8">
+        <div id="sh-cart-items"></div>
+      </div>
+      <div class="col-lg-4">
+        <div class="sh-summary-box">
+          <h5 class="fw-bold mb-3">Order Summary</h5>
+          <div class="d-flex justify-content-between mb-2"><span>Subtotal</span><span id="sh-sum-subtotal"></span></div>
+          <div class="d-flex justify-content-between mb-2"><span>Estimated Tax</span><span id="sh-sum-tax"></span></div>
+          <div class="d-flex justify-content-between mb-2"><span>Shipping</span><span id="sh-sum-shipping"></span></div>
+          <hr>
+          <div class="d-flex justify-content-between fw-bold fs-5 mb-3"><span>Total</span><span id="sh-sum-total"></span></div>
+          <a href="/checkout" class="btn btn-sh-primary w-100">Proceed to Checkout</a>
+          <a href="/products" class="btn btn-sh-outline w-100 mt-2">Continue Shopping</a>
+        </div>
+      </div>`;
+
+    renderCartItems(cart);
+  } catch (e) {
+    root.innerHTML = `<div class="col-12 sh-empty-state">Could not load your cart. ${SH.escapeHtml(e.message)}</div>`;
+  }
+}
+
+function renderCartItems(cart) {
+  const container = document.getElementById("sh-cart-items");
+  container.innerHTML = cart.items.map(item => `
+    <div class="sh-cart-line d-flex gap-3" data-item-id="${item.id}">
+      <img src="${item.product_image || '/static/images/no-image.png'}" style="width:90px;height:110px;object-fit:cover;border-radius:8px;">
+      <div class="flex-grow-1">
+        <div class="d-flex justify-content-between">
+          <div>
+            <strong>${SH.escapeHtml(item.product_name)}</strong>
+            <div class="small text-muted">Size: ${item.size} &middot; Color: ${item.color}</div>
+          </div>
+          <button class="btn btn-sm text-danger sh-remove-item" title="Remove"><i class="bi bi-trash"></i></button>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          <div class="sh-qty-control">
+            <button type="button" class="sh-qty-dec">-</button>
+            <input type="text" value="${item.quantity}" readonly>
+            <button type="button" class="sh-qty-inc">+</button>
+          </div>
+          <div class="fw-bold">${SH.fmtPrice(item.subtotal)}</div>
+        </div>
+        ${item.quantity >= item.stock ? `<div class="small text-danger mt-1">Max stock reached (${item.stock} available)</div>` : ""}
+      </div>
+    </div>
+  `).join("");
+
+  updateSummary(cart);
+
+  container.querySelectorAll(".sh-cart-line").forEach(line => {
+    const itemId = line.dataset.itemId;
+    line.querySelector(".sh-remove-item").addEventListener("click", async () => {
+      try {
+        const updated = await SH.api(`/api/cart/items/${itemId}`, { method: "DELETE" });
+        SH.toast("Item removed from cart.");
+        SH.refreshCartBadge();
+        if (updated.items.length === 0) { loadCart(); } else { renderCartItems(updated); }
+      } catch (e) { SH.toast(e.message, "error"); }
+    });
+    line.querySelector(".sh-qty-inc").addEventListener("click", async () => {
+      const input = line.querySelector("input");
+      const newQty = parseInt(input.value, 10) + 1;
+      try {
+        const updated = await SH.api(`/api/cart/items/${itemId}`, { method: "PUT", body: JSON.stringify({ quantity: newQty }) });
+        SH.refreshCartBadge();
+        renderCartItems(updated);
+      } catch (e) { SH.toast(e.message, "error"); }
+    });
+    line.querySelector(".sh-qty-dec").addEventListener("click", async () => {
+      const input = line.querySelector("input");
+      const newQty = Math.max(1, parseInt(input.value, 10) - 1);
+      try {
+        const updated = await SH.api(`/api/cart/items/${itemId}`, { method: "PUT", body: JSON.stringify({ quantity: newQty }) });
+        SH.refreshCartBadge();
+        renderCartItems(updated);
+      } catch (e) { SH.toast(e.message, "error"); }
+    });
+  });
+}
+
+function updateSummary(cart) {
+  document.getElementById("sh-sum-subtotal").textContent = SH.fmtPrice(cart.subtotal);
+  document.getElementById("sh-sum-tax").textContent = SH.fmtPrice(cart.estimated_tax);
+  document.getElementById("sh-sum-shipping").textContent = cart.estimated_shipping === 0 ? "FREE" : SH.fmtPrice(cart.estimated_shipping);
+  document.getElementById("sh-sum-total").textContent = SH.fmtPrice(cart.total);
+}
+
+loadCart();
+</script>
+{% endblock %}

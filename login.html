@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Login - StyleHub{% endblock %}
+{% block content %}
+<div class="container">
+  <div class="sh-auth-card">
+    <h3 class="fw-bold text-center mb-1">Welcome Back</h3>
+    <p class="text-muted text-center mb-4">Login to continue shopping</p>
+    <div id="sh-login-error" class="alert alert-danger d-none"></div>
+    <div class="mb-3">
+      <label class="form-label small">Username or Email</label>
+      <input type="text" class="form-control" id="l-username">
+    </div>
+    <div class="mb-3">
+      <label class="form-label small">Password</label>
+      <input type="password" class="form-control" id="l-password">
+    </div>
+    <button class="btn btn-sh-primary w-100" id="l-submit">Login</button>
+    <p class="text-center small mt-3 mb-0">Don't have an account? <a href="/register">Sign up</a></p>
+    <div class="alert alert-info small mt-3 mb-0">
+      Demo accounts: <br>
+      <strong>admin</strong> / Admin@123 &nbsp;|&nbsp; <strong>demo_user</strong> / Demo@1234
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById("l-submit").addEventListener("click", async () => {
+  const username = document.getElementById("l-username").value.trim();
+  const password = document.getElementById("l-password").value;
+  const errorBox = document.getElementById("sh-login-error");
+  errorBox.classList.add("d-none");
+
+  if (!username || !password) {
+    errorBox.textContent = "Please enter your username/email and password.";
+    errorBox.classList.remove("d-none");
+    return;
+  }
+
+  try {
+    const data = await SH.api("/api/auth/login-json", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    });
+    SH.setSession(data.access_token, data.user);
+    if (data.user.is_admin) {
+      window.location.href = "/admin";
+      return;
+    }
+    const next = SH.qs("next") || "/";
+    window.location.href = next;
+  } catch (e) {
+    errorBox.textContent = e.message;
+    errorBox.classList.remove("d-none");
+  }
+});
+
+document.getElementById("l-password").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("l-submit").click();
+});
+</script>
+{% endblock %}

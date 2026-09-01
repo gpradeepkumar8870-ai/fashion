@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Order Details - StyleHub{% endblock %}
+{% block content %}
+<div class="container py-4" id="sh-order-root" data-order-number="{{ order_number }}">
+  <div class="text-center py-5"><div class="spinner-border" style="color:var(--sh-primary);"></div></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const orderNumber = document.getElementById("sh-order-root").dataset.orderNumber;
+const STATUS_STEPS = ["pending", "confirmed", "shipped", "delivered"];
+
+async function loadOrder() {
+  if (!SH.requireAuthOrRedirect(`/orders/${orderNumber}`)) return;
+  const root = document.getElementById("sh-order-root");
+  try {
+    const order = await SH.api(`/api/orders/${orderNumber}`);
+    const stepIndex = STATUS_STEPS.indexOf(order.order_status);
+    const isCancelled = order.order_status === "cancelled";
+
+    root.innerHTML = `
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-4">
+        <div>
+          <h4 class="fw-bold mb-1">${order.order_number}</h4>
+          <span class="text-muted small">Placed on ${new Date(order.created_at).toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}</span>
+        </div>
+        <span class="sh-status-badge status-${order.order_status} fs-6">${order.order_status}</span>
+      </div>
+
+      ${!isCancelled ? `
+      <div class="d-flex justify-content-between mb-5 position-relative" style="max-width:520px;">
+        ${STATUS_STEPS.map((s, i) => `
+          <div class="text-center flex-fill">
+            <div class="rounded-circle mx-auto mb-1 d-flex align-items-center justify-content-center"
+                 style="width:32px;height:32px;background:${i <= stepIndex ? 'var(--sh-primary)' : '#E5E7EB'};color:#fff;font-size:0.8rem;">
+              ${i <= stepIndex ? '✓' : i + 1}
+            </div>
+            <div class="small text-capitalize">${s}</div>
+          </div>
+        `).join("")}
+      </div>` : `<div class="alert alert-danger">This order was cancelled.</div>`}
+
+      <div class="row">
+        <div class="col-lg-7 mb-4">
+          <div class="sh-filter-box">
+            <h6 class="fw-bold mb-3">Items</h6>
+            ${order.items.map(item => `
+              <div class="d-flex gap-3 mb-3">
+                <img src="${item.product_image || '/static/images/no-image.png'}" style="width:70px;height:88px;object-fit:cover;border-radius:8px;">
+                <div class="flex-grow-1">
+                  <strong>${SH.escapeHtml(item.product_name)}</strong>
+                  <div class="small text-muted">Size: ${item.variant_size} &middot; Color: ${item.variant_color} &middot; Qty: ${item.quantity}</div>
+                </div>
+                <div class="fw-bold">${SH.fmtPrice(item.price * item.quantity)}</div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+        <div class="col-lg-5 mb-4">
+          <div class="sh-summary-box mb-3">
+            <h6 class="fw-bold mb-2">Shipping Address</h6>
+            <p class="small mb-0">${SH.escapeHtml(order.shipping_address)}<br>
+            ${SH.escapeHtml(order.shipping_city)}, ${SH.escapeHtml(order.shipping_state)} ${SH.escapeHtml(order.shipping_zip)}<br>
+            ${SH.escapeHtml(order.shipping_country)}</p>
+          </div>
+          <div class="sh-summary-box mb-3">
+            <h6 class="fw-bold mb-2">Payment</h6>
+            <p class="small mb-1">Method: <strong class="text-capitalize">${order.payment_method}</strong></p>
+            <p class="small mb-0">Status: <strong class="text-capitalize">${order.payment_status}</strong></p>
+          </div>
+          <div class="sh-summary-box">
+            <div class="d-flex justify-content-between fw-bold fs-5"><span>Total</span><span>${SH.fmtPrice(order.total_amount)}</span></div>
+          </div>
+          ${(!isCancelled && !["shipped","delivered"].includes(order.order_status)) ? `
+            <button class="btn btn-outline-danger w-100 mt-3" id="sh-cancel-order">Cancel Order</button>
+          ` : ""}
+        </div>
+      </div>
+    `;
+
+    const cancelBtn = document.getElementById("sh-cancel-order");
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", async () => {
+        if (!confirm("Are you sure you want to cancel this order?")) return;
+        try {
+          await SH.api(`/api/orders/${orderNumber}/cancel`, { method: "POST" });
+          SH.toast("Order cancelled.");
+          loadOrder();
+        } catch (e) { SH.toast(e.message, "error"); }
+      });
+    }
+  } catch (e) {
+    root.innerHTML = `<div class="sh-empty-state">Order not found.</div>`;
+  }
+}
+loadOrder();
+</script>
+{% endblock %}

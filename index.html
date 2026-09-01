@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}StyleHub - Fashion that fits YOU{% endblock %}
+{% block content %}
+<div class="container">
+
+  <div class="sh-hero">
+    <div class="row">
+      <div class="col-lg-7">
+        <h1>Fashion that fits <span style="color:#D9A441;">YOU.</span></h1>
+        <p>Discover curated collections for men, women & kids — with AI-powered size recommendations so you order the right fit, every time.</p>
+        <div class="mt-4">
+          <a href="/products" class="btn btn-sh-primary btn-lg me-2">Shop Now</a>
+          <a href="/size-guide" class="btn btn-outline-light btn-lg">Find My Size</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sh-section-title">
+    <h4 class="mb-0">Shop by Category</h4>
+  </div>
+  <div class="row g-3 mb-5" id="sh-category-tiles">
+    <div class="col-6 col-md-3"><div class="sh-skeleton" style="height:150px;"></div></div>
+    <div class="col-6 col-md-3"><div class="sh-skeleton" style="height:150px;"></div></div>
+    <div class="col-6 col-md-3"><div class="sh-skeleton" style="height:150px;"></div></div>
+    <div class="col-6 col-md-3"><div class="sh-skeleton" style="height:150px;"></div></div>
+  </div>
+
+  <div class="sh-section-title">
+    <h4 class="mb-0">Featured Picks</h4>
+    <a href="/products?is_featured=true" class="btn btn-sh-outline btn-sm">View all</a>
+  </div>
+  <div class="row" id="sh-featured-products">
+    <div class="col-6 col-md-3 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+    <div class="col-6 col-md-3 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+    <div class="col-6 col-md-3 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+    <div class="col-6 col-md-3 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+  </div>
+
+  <div class="sh-section-title mt-4">
+    <h4 class="mb-0">Bestsellers</h4>
+    <a href="/products?is_bestseller=true" class="btn btn-sh-outline btn-sm">View all</a>
+  </div>
+  <div class="row" id="sh-bestseller-products">
+    <div class="col-6 col-md-3 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+    <div class="col-6 col-md-3 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+    <div class="col-6 col-md-3 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+    <div class="col-6 col-md-3 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+  </div>
+
+  <div class="row mt-5 mb-5 g-4 text-center">
+    <div class="col-md-4">
+      <i class="bi bi-rulers fs-1" style="color:var(--sh-accent);"></i>
+      <h6 class="fw-bold mt-2">AI Size Recommendation</h6>
+      <p class="small text-muted">Enter your measurements once, get the right size on every product.</p>
+    </div>
+    <div class="col-md-4">
+      <i class="bi bi-truck fs-1" style="color:var(--sh-accent);"></i>
+      <h6 class="fw-bold mt-2">Free Shipping over ₹999</h6>
+      <p class="small text-muted">Fast, trackable delivery across India.</p>
+    </div>
+    <div class="col-md-4">
+      <i class="bi bi-arrow-repeat fs-1" style="color:var(--sh-accent);"></i>
+      <h6 class="fw-bold mt-2">Easy Returns</h6>
+      <p class="small text-muted">Cancel anytime before your order ships.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/products.js?v=2"></script>
+<script>
+async function loadCategories() {
+  try {
+    const categories = await SH.api("/api/categories");
+    const container = document.getElementById("sh-category-tiles");
+    container.innerHTML = categories.slice(0, 8).map(c => `
+      <div class="col-6 col-md-3">
+        <a href="/products?category=${c.slug}" class="sh-cat-tile">
+          <img src="${c.image || '/static/images/no-image.png'}" alt="${SH.escapeHtml(c.name)}">
+          <div class="sh-cat-label">${SH.escapeHtml(c.name)}</div>
+        </a>
+      </div>`).join("");
+  } catch (e) { console.error(e); }
+}
+
+async function loadProductSection(elementId, params) {
+  try {
+    const query = new URLSearchParams(params).toString();
+    const data = await SH.api(`/api/products?${query}`);
+    const container = document.getElementById(elementId);
+    if (data.products.length === 0) {
+      container.innerHTML = `<div class="sh-empty-state w-100">No products found yet.</div>`;
+      return;
+    }
+    container.innerHTML = data.products.map(shRenderProductCard).join("");
+    shBindWishlistButtons(container);
+    shMarkWishlistedCards(container);
+  } catch (e) { console.error(e); }
+}
+
+loadCategories();
+loadProductSection("sh-featured-products", { is_featured: "true", page_size: 8 });
+loadProductSection("sh-bestseller-products", { is_bestseller: "true", page_size: 8 });
+</script>
+{% endblock %}

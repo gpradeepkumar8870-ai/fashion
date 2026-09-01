@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}StyleHub - Fashion Store{% endblock %}</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="/static/css/style.css?v=2" rel="stylesheet">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div id="sh-admin-banner" style="display:none;background:#D9A441;color:#1B2A4A;text-align:center;padding:8px 12px;font-weight:700;font-size:0.9rem;">
+  <i class="bi bi-shield-lock-fill"></i> You're signed in as an <strong>Administrator</strong> —
+  <a href="/admin" style="color:#1B2A4A;text-decoration:underline;">Go to Admin Dashboard</a>
+</div>
+
+<nav class="navbar navbar-expand-lg sh-navbar sticky-top">
+  <div class="container">
+    <a class="navbar-brand" href="/">Style<span>Hub</span></a>
+    <button class="navbar-toggler bg-light" type="button" data-bs-toggle="collapse" data-bs-target="#shNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="shNav">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-3">
+        <li class="nav-item"><a class="nav-link {% if page=='home' %}active{% endif %}" href="/">Home</a></li>
+        <li class="nav-item"><a class="nav-link {% if page=='products' %}active{% endif %}" href="/products">Shop</a></li>
+        <li class="nav-item"><a class="nav-link {% if page=='size_guide' %}active{% endif %}" href="/size-guide">Size Guide</a></li>
+      </ul>
+      <form class="d-flex sh-search-form me-3" id="sh-search-form" role="search">
+        <input class="form-control" type="search" id="sh-search-input" placeholder="Search for products, brands...">
+        <button class="btn" type="submit"><i class="bi bi-search"></i></button>
+      </form>
+      <ul class="navbar-nav align-items-lg-center">
+        <li class="nav-item" id="sh-admin-nav-slot"></li>
+        <li class="nav-item"><a class="nav-link" href="/wishlist"><i class="bi bi-heart"></i></a></li>
+        <li class="nav-item position-relative">
+          <a class="nav-link" href="/cart">
+            <i class="bi bi-bag"></i>
+            <span class="sh-cart-badge" style="display:none;">0</span>
+          </a>
+        </li>
+        <li class="nav-item" id="sh-auth-area"></li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="sh-footer">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-md-4">
+        <h5 class="fw-bold text-white">Style<span style="color:#D9A441;">Hub</span></h5>
+        <p class="small mt-2">Fashion that fits YOU. Discover curated men's, women's & kids' wear with AI-powered size recommendations, built as part of a Remote Python Full Stack Internship (Task PY-EC-004).</p>
+      </div>
+      <div class="col-md-2">
+        <h6>Shop</h6>
+        <ul class="list-unstyled small">
+          <li><a href="/products?gender=men">Men</a></li>
+          <li><a href="/products?gender=women">Women</a></li>
+          <li><a href="/products?gender=kids">Kids</a></li>
+          <li><a href="/products?is_bestseller=true">Bestsellers</a></li>
+        </ul>
+      </div>
+      <div class="col-md-2">
+        <h6>Account</h6>
+        <ul class="list-unstyled small">
+          <li><a href="/profile">My Profile</a></li>
+          <li><a href="/orders">Order History</a></li>
+          <li><a href="/wishlist">Wishlist</a></li>
+          <li><a href="/cart">Cart</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <h6>About This Project</h6>
+        <p class="small mt-2 mb-0">Task PY-EC-004 &middot; FastAPI + MySQL/SQLite &middot; JWT Auth &middot; AI-based Size Recommendation Engine</p>
+      </div>
+    </div>
+    <hr class="border-secondary mt-4">
+    <p class="text-center small mb-0">&copy; 2026 StyleHub. Built for educational / internship purposes.</p>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/main.js?v=2"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

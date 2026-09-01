@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Checkout - StyleHub{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h3 class="fw-bold mb-4">Checkout</h3>
+  <div class="row">
+    <div class="col-lg-7">
+      <div class="sh-filter-box mb-4">
+        <h5 class="fw-bold mb-3">Shipping Address</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label small">Full Address</label>
+            <textarea class="form-control" id="c-address" rows="2" placeholder="House no, street, area"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">City</label>
+            <input type="text" class="form-control" id="c-city">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">State</label>
+            <input type="text" class="form-control" id="c-state">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">ZIP / Pincode</label>
+            <input type="text" class="form-control" id="c-zip">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Country</label>
+            <input type="text" class="form-control" id="c-country" value="India">
+          </div>
+        </div>
+      </div>
+
+      <div class="sh-filter-box mb-4">
+        <h5 class="fw-bold mb-3">Payment Method</h5>
+        <div class="d-flex flex-column gap-2">
+          <label class="d-flex align-items-center gap-2 border rounded p-2">
+            <input type="radio" name="payment" value="card" checked> <i class="bi bi-credit-card"></i> Credit / Debit Card
+          </label>
+          <label class="d-flex align-items-center gap-2 border rounded p-2">
+            <input type="radio" name="payment" value="upi"> <i class="bi bi-phone"></i> UPI
+          </label>
+          <label class="d-flex align-items-center gap-2 border rounded p-2">
+            <input type="radio" name="payment" value="netbanking"> <i class="bi bi-bank"></i> Net Banking
+          </label>
+          <label class="d-flex align-items-center gap-2 border rounded p-2">
+            <input type="radio" name="payment" value="cod"> <i class="bi bi-cash"></i> Cash on Delivery
+          </label>
+        </div>
+        <p class="small text-muted mt-2 mb-0"><i class="bi bi-shield-check"></i> This is a demo payment flow for internship purposes - no real transaction is processed.</p>
+      </div>
+
+      <div class="sh-filter-box">
+        <label class="form-label small">Order Notes (optional)</label>
+        <textarea class="form-control" id="c-notes" rows="2" placeholder="Delivery instructions..."></textarea>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="sh-summary-box">
+        <h5 class="fw-bold mb-3">Order Summary</h5>
+        <div id="sh-checkout-items" class="mb-3" style="max-height:280px;overflow-y:auto;"></div>
+        <hr>
+        <div class="d-flex justify-content-between mb-2"><span>Subtotal</span><span id="sh-co-subtotal"></span></div>
+        <div class="d-flex justify-content-between mb-2"><span>Estimated Tax</span><span id="sh-co-tax"></span></div>
+        <div class="d-flex justify-content-between mb-2"><span>Shipping</span><span id="sh-co-shipping"></span></div>
+        <hr>
+        <div class="d-flex justify-content-between fw-bold fs-5 mb-3"><span>Total</span><span id="sh-co-total"></span></div>
+        <button class="btn btn-sh-primary w-100" id="sh-place-order">Place Order</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadCheckoutSummary() {
+  if (!SH.requireAuthOrRedirect("/checkout")) return;
+  try {
+    const cart = await SH.api("/api/cart");
+    if (cart.items.length === 0) {
+      SH.toast("Your cart is empty.", "info");
+      window.location.href = "/cart";
+      return;
+    }
+    document.getElementById("sh-checkout-items").innerHTML = cart.items.map(item => `
+      <div class="d-flex justify-content-between small mb-2">
+        <span>${SH.escapeHtml(item.product_name)} (${item.size}/${item.color}) x${item.quantity}</span>
+        <span>${SH.fmtPrice(item.subtotal)}</span>
+      </div>`).join("");
+    document.getElementById("sh-co-subtotal").textContent = SH.fmtPrice(cart.subtotal);
+    document.getElementById("sh-co-tax").textContent = SH.fmtPrice(cart.estimated_tax);
+    document.getElementById("sh-co-shipping").textContent = cart.estimated_shipping === 0 ? "FREE" : SH.fmtPrice(cart.estimated_shipping);
+    document.getElementById("sh-co-total").textContent = SH.fmtPrice(cart.total);
+
+    // prefill from profile
+    const user = SH.getUser();
+    const me = await SH.api("/api/auth/me");
+    if (me.address) document.getElementById("c-address").value = me.address;
+    if (me.city) document.getElementById("c-city").value = me.city;
+    if (me.state) document.getElementById("c-state").value = me.state;
+    if (me.zip_code) document.getElementById("c-zip").value = me.zip_code;
+    if (me.country) document.getElementById("c-country").value = me.country;
+  } catch (e) {
+    SH.toast(e.message, "error");
+  }
+}
+
+document.getElementById("sh-place-order").addEventListener("click", async () => {
+  const address = document.getElementById("c-address").value.trim();
+  const city = document.getElementById("c-city").value.trim();
+  const state = document.getElementById("c-state").value.trim();
+  const zip = document.getElementById("c-zip").value.trim();
+  const country = document.getElementById("c-country").value.trim() || "India";
+  const paymentMethod = document.querySelector('input[name="payment"]:checked').value;
+
+  if (!address || !city || !state || !zip) {
+    SH.toast("Please fill in your complete shipping address.", "error");
+    return;
+  }
+
+  const btn = document.getElementById("sh-place-order");
+  btn.disabled = true;
+  btn.textContent = "Placing order...";
+
+  try {
+    const order = await SH.api("/api/orders/checkout", {
+      method: "POST",
+      body: JSON.stringify({
+        shipping: { shipping_address: address, shipping_city: city, shipping_state: state, shipping_zip: zip, shipping_country: country },
+        payment_method: paymentMethod,
+        notes: document.getElementById("c-notes").value.trim() || null,
+      }),
+    });
+    SH.toast("Order placed successfully!");
+    SH.refreshCartBadge();
+    window.location.href = `/orders/${order.order_number}`;
+  } catch (e) {
+    SH.toast(e.message, "error");
+    btn.disabled = false;
+    btn.textContent = "Place Order";
+  }
+});
+
+loadCheckoutSummary();
+</script>
+{% endblock %}

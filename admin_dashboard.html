@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard - StyleHub{% endblock %}
+{% block content %}
+<div class="container py-4" id="sh-admin-root">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h3 class="fw-bold mb-0"><span class="sh-admin-pill me-2">ADMIN</span>Dashboard</h3>
+      <p class="text-muted mb-0">Store overview and quick actions</p>
+    </div>
+    <ul class="nav sh-admin-tabs">
+      <li class="nav-item"><a class="nav-link active" href="/admin">Dashboard</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin/products">Products</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin/orders">Orders</a></li>
+    </ul>
+  </div>
+
+  <div id="sh-stats-grid" class="row g-3 mb-4">
+    <div class="col-12 text-center py-4"><div class="spinner-border" style="color:var(--sh-primary);"></div></div>
+  </div>
+
+  <div class="row">
+    <div class="col-12">
+      <div class="sh-filter-box">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="fw-bold mb-0">Recent Orders</h5>
+          <a href="/admin/orders" class="btn btn-sh-outline btn-sm">Manage All Orders</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table sh-admin-table">
+            <thead><tr><th>Order #</th><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody id="sh-recent-orders-body">
+              <tr><td colspan="5" class="text-center text-muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadAdminDashboard() {
+  if (!SH.requireAdminOrRedirect()) return;
+  try {
+    const stats = await SH.api("/api/admin/stats");
+
+    document.getElementById("sh-stats-grid").innerHTML = `
+      <div class="col-6 col-md-3">
+        <div class="sh-stat-card">
+          <div class="sh-stat-value">${stats.total_products}</div>
+          <div class="sh-stat-label">Products (${stats.active_products} active)</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sh-stat-card">
+          <div class="sh-stat-value">${stats.total_orders}</div>
+          <div class="sh-stat-label">Total Orders (${stats.pending_orders} pending)</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sh-stat-card">
+          <div class="sh-stat-value">${SH.fmtPrice(stats.total_revenue)}</div>
+          <div class="sh-stat-label">Revenue (paid orders)</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sh-stat-card">
+          <div class="sh-stat-value">${stats.total_users}</div>
+          <div class="sh-stat-label">Registered Shoppers</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-6">
+        <div class="sh-stat-card d-flex justify-content-between align-items-center">
+          <div>
+            <div class="sh-stat-value text-warning">${stats.low_stock_variants}</div>
+            <div class="sh-stat-label">Low Stock Variants (≤3 units)</div>
+          </div>
+          <i class="bi bi-exclamation-triangle fs-1 text-warning"></i>
+        </div>
+      </div>
+      <div class="col-6 col-md-6">
+        <div class="sh-stat-card d-flex justify-content-between align-items-center">
+          <div>
+            <div class="sh-stat-value text-danger">${stats.out_of_stock_variants}</div>
+            <div class="sh-stat-label">Out of Stock Variants</div>
+          </div>
+          <i class="bi bi-x-circle fs-1 text-danger"></i>
+        </div>
+      </div>
+    `;
+
+    const tbody = document.getElementById("sh-recent-orders-body");
+    if (stats.recent_orders.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No orders yet.</td></tr>`;
+    } else {
+      tbody.innerHTML = stats.recent_orders.map(o => `
+        <tr>
+          <td><a href="/admin/orders">${o.order_number}</a></td>
+          <td>${SH.escapeHtml(o.customer)}</td>
+          <td>${SH.fmtPrice(o.total_amount)}</td>
+          <td><span class="sh-status-badge status-${o.order_status}">${o.order_status}</span></td>
+          <td>${new Date(o.created_at).toLocaleDateString("en-IN")}</td>
+        </tr>
+      `).join("");
+    }
+  } catch (e) {
+    SH.toast(e.message, "error");
+  }
+}
+loadAdminDashboard();
+</script>
+{% endblock %}

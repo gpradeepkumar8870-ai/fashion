@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Shop All Products - StyleHub{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="row">
+    <div class="col-lg-3 mb-4">
+      <div class="sh-filter-box">
+        <h5 class="fw-bold mb-3">Filters</h5>
+
+        <h6>Category</h6>
+        <select class="form-select form-select-sm" id="f-category">
+          <option value="">All Categories</option>
+        </select>
+
+        <h6>Brand</h6>
+        <select class="form-select form-select-sm" id="f-brand">
+          <option value="">All Brands</option>
+        </select>
+
+        <h6>Gender</h6>
+        <select class="form-select form-select-sm" id="f-gender">
+          <option value="">All</option>
+          <option value="men">Men</option>
+          <option value="women">Women</option>
+          <option value="kids">Kids</option>
+          <option value="unisex">Unisex</option>
+        </select>
+
+        <h6>Size</h6>
+        <div id="f-sizes" class="d-flex flex-wrap gap-2"></div>
+
+        <h6>Color</h6>
+        <div id="f-colors" class="d-flex flex-wrap gap-2"></div>
+
+        <h6>Price Range</h6>
+        <div class="d-flex gap-2 align-items-center">
+          <input type="number" id="f-min-price" class="form-control form-control-sm" placeholder="Min">
+          <span>-</span>
+          <input type="number" id="f-max-price" class="form-control form-control-sm" placeholder="Max">
+        </div>
+
+        <button class="btn btn-sh-primary btn-sm w-100 mt-4" id="f-apply">Apply Filters</button>
+        <button class="btn btn-sh-outline btn-sm w-100 mt-2" id="f-clear">Clear All</button>
+      </div>
+    </div>
+
+    <div class="col-lg-9">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div>
+          <h4 class="fw-bold mb-0" id="sh-results-title">All Products</h4>
+          <small class="text-muted" id="sh-results-count"></small>
+        </div>
+        <select class="form-select form-select-sm w-auto" id="f-sort">
+          <option value="newest">Newest First</option>
+          <option value="price_asc">Price: Low to High</option>
+          <option value="price_desc">Price: High to Low</option>
+          <option value="rating">Highest Rated</option>
+          <option value="popularity">Most Popular</option>
+        </select>
+      </div>
+
+      <div class="row" id="sh-product-grid">
+        <div class="col-6 col-md-4 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+        <div class="col-6 col-md-4 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+        <div class="col-6 col-md-4 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+        <div class="col-6 col-md-4 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+        <div class="col-6 col-md-4 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+        <div class="col-6 col-md-4 mb-4"><div class="sh-skeleton" style="height:320px;"></div></div>
+      </div>
+
+      <nav>
+        <ul class="pagination justify-content-center" id="sh-pagination"></ul>
+      </nav>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/products.js?v=2"></script>
+<script>
+let currentPage = 1;
+let selectedSize = null;
+let selectedColor = null;
+
+function getFilters() {
+  const params = {
+    page: currentPage,
+    page_size: 12,
+    sort_by: document.getElementById("f-sort").value,
+  };
+  const search = SH.qs("search");
+  if (search) params.search = search;
+  const category = document.getElementById("f-category").value;
+  if (category) params.category = category;
+  const brand = document.getElementById("f-brand").value;
+  if (brand) params.brand = brand;
+  const gender = document.getElementById("f-gender").value;
+  if (gender) params.gender = gender;
+  if (selectedSize) params.size = selectedSize;
+  if (selectedColor) params.color = selectedColor;
+  const minPrice = document.getElementById("f-min-price").value;
+  if (minPrice) params.min_price = minPrice;
+  const maxPrice = document.getElementById("f-max-price").value;
+  if (maxPrice) params.max_price = maxPrice;
+  if (SH.qs("is_featured")) params.is_featured = SH.qs("is_featured");
+  if (SH.qs("is_bestseller")) params.is_bestseller = SH.qs("is_bestseller");
+  return params;
+}
+
+async function loadFilterOptions() {
+  try {
+    const options = await SH.api("/api/products/filters/options");
+    const catSelect = document.getElementById("f-category");
+    options.categories.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c.slug; opt.textContent = c.name;
+      catSelect.appendChild(opt);
+    });
+    const brandSelect = document.getElementById("f-brand");
+    options.brands.forEach((b) => {
+      const opt = document.createElement("option");
+      opt.value = b.name; opt.textContent = b.name;
+      brandSelect.appendChild(opt);
+    });
+    const sizeContainer = document.getElementById("f-sizes");
+    sizeContainer.innerHTML = options.sizes.map(s =>
+      `<span class="sh-size-chip" data-size="${s}">${s}</span>`
+    ).join("");
+    sizeContainer.querySelectorAll(".sh-size-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const wasActive = chip.classList.contains("active");
+        sizeContainer.querySelectorAll(".sh-size-chip").forEach(c => c.classList.remove("active"));
+        selectedSize = wasActive ? null : chip.dataset.size;
+        if (!wasActive) chip.classList.add("active");
+      });
+    });
+    const colorContainer = document.getElementById("f-colors");
+    colorContainer.innerHTML = options.colors.map(c =>
+      `<span class="sh-color-dot" style="background:${shColorToHex(c)}" data-color="${c}" title="${SH.escapeHtml(c)}"></span>`
+    ).join("");
+    colorContainer.querySelectorAll(".sh-color-dot").forEach(dot => {
+      dot.addEventListener("click", () => {
+        const wasActive = dot.classList.contains("active");
+        colorContainer.querySelectorAll(".sh-color-dot").forEach(d => d.classList.remove("active"));
+        selectedColor = wasActive ? null : dot.dataset.color;
+        if (!wasActive) dot.classList.add("active");
+      });
+    });
+
+    // preselect from query string
+    const preCategory = SH.qs("category");
+    if (preCategory) catSelect.value = preCategory;
+  } catch (e) { console.error(e); }
+}
+
+function renderPagination(data) {
+  const pag = document.getElementById("sh-pagination");
+  pag.innerHTML = "";
+  if (data.total_pages <= 1) return;
+  for (let i = 1; i <= data.total_pages; i++) {
+    const li = document.createElement("li");
+    li.className = "page-item" + (i === data.page ? " active" : "");
+    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+    li.addEventListener("click", (e) => {
+      e.preventDefault();
+      currentPage = i;
+      loadProducts();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+    pag.appendChild(li);
+  }
+}
+
+async function loadProducts() {
+  const grid = document.getElementById("sh-product-grid");
+  grid.innerHTML = `<div class="col-12 text-center py-5"><div class="spinner-border" style="color:var(--sh-primary);"></div></div>`;
+  try {
+    const params = getFilters();
+    const data = await SH.api(`/api/products?${new URLSearchParams(params).toString()}`);
+    document.getElementById("sh-results-count").textContent = `${data.total} product(s) found`;
+    if (data.products.length === 0) {
+      grid.innerHTML = `<div class="sh-empty-state w-100"><i class="bi bi-search fs-1"></i><p class="mt-2">No products match your filters. Try adjusting them.</p></div>`;
+    } else {
+      grid.innerHTML = data.products.map(shRenderProductCard).join("");
+      shBindWishlistButtons(grid);
+      shMarkWishlistedCards(grid);
+    }
+    renderPagination(data);
+  } catch (e) {
+    grid.innerHTML = `<div class="sh-empty-state w-100">Something went wrong loading products.</div>`;
+  }
+}
+
+document.getElementById("f-apply").addEventListener("click", () => { currentPage = 1; loadProducts(); });
+document.getElementById("f-sort").addEventListener("change", () => { currentPage = 1; loadProducts(); });
+document.getElementById("f-clear").addEventListener("click", () => {
+  document.getElementById("f-category").value = "";
+  document.getElementById("f-brand").value = "";
+  document.getElementById("f-gender").value = "";
+  document.getElementById("f-min-price").value = "";
+  document.getElementById("f-max-price").value = "";
+  selectedSize = null; selectedColor = null;
+  document.querySelectorAll(".sh-size-chip, .sh-color-dot").forEach(el => el.classList.remove("active"));
+  currentPage = 1;
+  history.replaceState(null, "", "/products");
+  loadProducts();
+});
+
+const searchTerm = SH.qs("search");
+if (searchTerm) document.getElementById("sh-results-title").textContent = `Results for "${searchTerm}"`;
+
+loadFilterOptions().then(loadProducts);
+</script>
+{% endblock %}

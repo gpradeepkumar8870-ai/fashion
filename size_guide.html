@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Size Guide - StyleHub{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="row">
+    <div class="col-lg-6 mb-4">
+      <h3 class="fw-bold mb-1"><i class="bi bi-rulers"></i> Find Your Perfect Size</h3>
+      <p class="text-muted">Our AI-based recommendation engine compares your measurements against standard size charts to suggest the best fit.</p>
+      <div class="sh-filter-box">
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label small">Height (cm)</label>
+            <input type="number" class="form-control" id="sg-height" placeholder="e.g. 170">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Weight (kg)</label>
+            <input type="number" class="form-control" id="sg-weight" placeholder="e.g. 65">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Chest (cm)</label>
+            <input type="number" class="form-control" id="sg-chest" placeholder="optional">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Waist (cm)</label>
+            <input type="number" class="form-control" id="sg-waist" placeholder="optional">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Hip (cm)</label>
+            <input type="number" class="form-control" id="sg-hip" placeholder="optional">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Gender</label>
+            <select class="form-select" id="sg-gender">
+              <option value="unisex">Unisex</option>
+              <option value="men">Men</option>
+              <option value="women">Women</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Preferred Fit</label>
+            <select class="form-select" id="sg-fit">
+              <option value="regular">Regular</option>
+              <option value="slim">Slim</option>
+              <option value="loose">Loose</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-sh-primary w-100 mt-3" id="sg-submit">Get My Recommended Size</button>
+
+        <div id="sg-result" class="mt-4 d-none">
+          <div class="alert alert-success">
+            <h5 class="mb-1">Recommended Size: <strong id="sg-size"></strong></h5>
+            <div class="small">Confidence: <span id="sg-confidence"></span> &middot; Estimated BMI: <span id="sg-bmi"></span></div>
+          </div>
+          <p id="sg-explanation" class="small"></p>
+          <p class="small text-muted mb-1">Runner-up size: <strong id="sg-alternate"></strong></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6 mb-4">
+      <h5 class="fw-bold mb-3">Standard Size Chart <span class="small text-muted" id="sg-chart-gender-label"></span></h5>
+      <div class="table-responsive">
+        <table class="table table-bordered bg-white" id="sg-chart-table">
+          <thead><tr><th>Size</th><th>Chest/Bust (cm)</th><th>Waist (cm)</th><th>Hip (cm)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="alert alert-info small mt-3">
+        <strong>How it works:</strong> we compare your measurements (or an estimate derived from your height & weight)
+        against these bands using a weighted distance score, then nudge the result based on your preferred fit.
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function renderChart(gender) {
+  try {
+    const result = await SH.api("/api/size-recommendation", {
+      method: "POST",
+      body: JSON.stringify({ height_cm: 170, weight_kg: 65, gender: gender || "unisex", fit_preference: "regular" }),
+    });
+    const tbody = document.querySelector("#sg-chart-table tbody");
+    tbody.innerHTML = Object.entries(result.size_chart).map(([size, v]) => `
+      <tr><td><strong>${size}</strong></td><td>${v.chest_cm}</td><td>${v.waist_cm}</td><td>${v.hip_cm}</td></tr>
+    `).join("");
+    document.getElementById("sg-chart-gender-label").textContent = `(${gender || "unisex"})`;
+  } catch (e) { console.error(e); }
+}
+renderChart("unisex");
+
+document.getElementById("sg-gender").addEventListener("change", (e) => renderChart(e.target.value));
+
+document.getElementById("sg-submit").addEventListener("click", async () => {
+  const height = parseFloat(document.getElementById("sg-height").value);
+  const weight = parseFloat(document.getElementById("sg-weight").value);
+  if (!height || !weight) { SH.toast("Please enter your height and weight.", "error"); return; }
+  const payload = {
+    height_cm: height, weight_kg: weight,
+    chest_cm: parseFloat(document.getElementById("sg-chest").value) || null,
+    waist_cm: parseFloat(document.getElementById("sg-waist").value) || null,
+    hip_cm: parseFloat(document.getElementById("sg-hip").value) || null,
+    gender: document.getElementById("sg-gender").value,
+    fit_preference: document.getElementById("sg-fit").value,
+  };
+  try {
+    const result = await SH.api("/api/size-recommendation", { method: "POST", body: JSON.stringify(payload) });
+    document.getElementById("sg-result").classList.remove("d-none");
+    document.getElementById("sg-size").textContent = result.recommended_size;
+    document.getElementById("sg-confidence").textContent = Math.round(result.confidence * 100) + "%";
+    document.getElementById("sg-bmi").textContent = result.bmi;
+    document.getElementById("sg-explanation").textContent = result.explanation;
+    document.getElementById("sg-alternate").textContent = result.alternate_size || "N/A";
+  } catch (e) { SH.toast(e.message, "error"); }
+});
+</script>
+{% endblock %}

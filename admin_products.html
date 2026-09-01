@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Manage Products - StyleHub Admin{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+      <h3 class="fw-bold mb-0"><span class="sh-admin-pill me-2">ADMIN</span>Manage Products</h3>
+      <p class="text-muted mb-0">Toggle active status, edit price/flags, and adjust stock per size/color</p>
+    </div>
+    <ul class="nav sh-admin-tabs">
+      <li class="nav-item"><a class="nav-link" href="/admin">Dashboard</a></li>
+      <li class="nav-item"><a class="nav-link active" href="/admin/products">Products</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin/orders">Orders</a></li>
+    </ul>
+  </div>
+
+  <div class="d-flex gap-2 mb-3">
+    <input type="text" id="ap-search" class="form-control" placeholder="Search products by name..." style="max-width:320px;">
+    <button class="btn btn-sh-primary" id="ap-search-btn">Search</button>
+  </div>
+
+  <div class="sh-filter-box">
+    <div class="table-responsive">
+      <table class="table sh-admin-table align-middle">
+        <thead>
+          <tr>
+            <th>Product</th><th>Category</th><th>Brand</th><th>Price</th>
+            <th>Stock</th><th>Status</th><th>Flags</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="ap-table-body">
+          <tr><td colspan="8" class="text-center text-muted">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <nav><ul class="pagination justify-content-center" id="ap-pagination"></ul></nav>
+  </div>
+</div>
+
+<!-- Edit product modal -->
+<div class="modal fade" id="editProductModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="ep-id">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label small">Name</label>
+            <input type="text" class="form-control" id="ep-name">
+          </div>
+          <div class="col-12">
+            <label class="form-label small">Description</label>
+            <textarea class="form-control" id="ep-description" rows="2"></textarea>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Price (₹)</label>
+            <input type="number" class="form-control" id="ep-price">
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Discount Price (₹, optional)</label>
+            <input type="number" class="form-control" id="ep-discount-price">
+          </div>
+          <div class="col-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="ep-active">
+              <label class="form-check-label" for="ep-active">Active</label>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="ep-featured">
+              <label class="form-check-label" for="ep-featured">Featured</label>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="ep-bestseller">
+              <label class="form-check-label" for="ep-bestseller">Bestseller</label>
+            </div>
+          </div>
+        </div>
+
+        <hr>
+        <h6 class="fw-bold">Stock by Size / Color</h6>
+        <div id="ep-variants" class="row g-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-sh-outline" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-sh-primary" id="ep-save">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let apPage = 1;
+let apSearch = "";
+
+async function loadAdminProducts() {
+  if (!SH.requireAdminOrRedirect()) return;
+  const tbody = document.getElementById("ap-table-body");
+  tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">Loading...</td></tr>`;
+  try {
+    const params = new URLSearchParams({ page: apPage, page_size: 15 });
+    if (apSearch) params.set("search", apSearch);
+    const data = await SH.api(`/api/admin/products?${params.toString()}`);
+
+    if (data.products.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="8" class="text-center text-muted">No products found.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.products.map(p => `
+      <tr>
+        <td>
+          <div class="d-flex align-items-center gap-2">
+            <img src="${p.primary_image || '/static/images/no-image.png'}" style="width:40px;height:50px;object-fit:cover;border-radius:6px;">
+            <span>${SH.escapeHtml(p.name)}</span>
+          </div>
+        </td>
+        <td>${SH.escapeHtml(p.category || "-")}</td>
+        <td>${SH.escapeHtml(p.brand || "-")}</td>
+        <td>${SH.fmtPrice(p.discount_price || p.price)}</td>
+        <td>${p.total_stock <= 0 ? '<span class="text-danger fw-bold">0</span>' : (p.total_stock <= 15 ? `<span class="text-warning fw-bold">${p.total_stock}</span>` : p.total_stock)}</td>
+        <td><span class="badge ${p.is_active ? 'bg-success' : 'bg-secondary'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td>
+          ${p.is_featured ? '<span class="badge bg-info text-dark me-1">Featured</span>' : ''}
+          ${p.is_bestseller ? '<span class="badge" style="background:var(--sh-primary);">Bestseller</span>' : ''}
+        </td>
+        <td>
+          <button class="btn btn-sm btn-sh-outline ap-edit-btn" data-id="${p.id}">Edit</button>
+          ${p.is_active ? `<button class="btn btn-sm btn-outline-danger ap-deactivate-btn" data-id="${p.id}">Deactivate</button>` : `<button class="btn btn-sm btn-outline-success ap-activate-btn" data-id="${p.id}">Activate</button>`}
+        </td>
+      </tr>
+    `).join("");
+
+    document.querySelectorAll(".ap-edit-btn").forEach(btn => {
+      btn.addEventListener("click", () => openEditModal(btn.dataset.id));
+    });
+    document.querySelectorAll(".ap-deactivate-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        if (!confirm("Deactivate this product? It will be hidden from the storefront.")) return;
+        try {
+          await SH.api(`/api/admin/products/${btn.dataset.id}`, { method: "DELETE" });
+          SH.toast("Product deactivated.");
+          loadAdminProducts();
+        } catch (e) { SH.toast(e.message, "error"); }
+      });
+    });
+    document.querySelectorAll(".ap-activate-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          await SH.api(`/api/admin/products/${btn.dataset.id}`, { method: "PUT", body: JSON.stringify({ is_active: true }) });
+          SH.toast("Product activated.");
+          loadAdminProducts();
+        } catch (e) { SH.toast(e.message, "error"); }
+      });
+    });
+
+    renderPagination(data);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">Failed to load: ${SH.escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
+function renderPagination(data) {
+  const pag = document.getElementById("ap-pagination");
+  const totalPages = Math.ceil(data.total / data.page_size);
+  pag.innerHTML = "";
+  for (let i = 1; i <= totalPages; i++) {
+    const li = document.createElement("li");
+    li.className = "page-item" + (i === apPage ? " active" : "");
+    li.innerHTML = `<a class="page-link" href="#">${i}</a>`;
+    li.addEventListener("click", (e) => { e.preventDefault(); apPage = i; loadAdminProducts(); });
+    pag.appendChild(li);
+  }
+}
+
+document.getElementById("ap-search-btn").addEventListener("click", () => {
+  apSearch = document.getElementById("ap-search").value.trim();
+  apPage = 1;
+  loadAdminProducts();
+});
+
+let editingProductId = null;
+let editingProductActive = true;
+
+async function openEditModal(productId) {
+  editingProductId = productId;
+  try {
+    const product = await SH.api(`/api/admin/products/${productId}`);
+    // fetch active status from the list view since detail endpoint doesn't expose it
+    const listData = await SH.api(`/api/admin/products?page_size=1&search=${encodeURIComponent(product.name)}`);
+    const match = listData.products.find(p => p.id === product.id);
+    editingProductActive = match ? match.is_active : true;
+
+    document.getElementById("ep-id").value = product.id;
+    document.getElementById("ep-name").value = product.name;
+    document.getElementById("ep-description").value = product.description || "";
+    document.getElementById("ep-price").value = product.price;
+    document.getElementById("ep-discount-price").value = product.discount_price || "";
+    document.getElementById("ep-active").checked = editingProductActive;
+    document.getElementById("ep-featured").checked = product.is_featured;
+    document.getElementById("ep-bestseller").checked = product.is_bestseller;
+
+    document.getElementById("ep-variants").innerHTML = product.variants.map(v => `
+      <div class="col-6 col-md-4">
+        <div class="border rounded p-2 d-flex justify-content-between align-items-center">
+          <span class="small">${v.size} / ${v.color}</span>
+          <input type="number" min="0" class="form-control form-control-sm ep-stock-input" style="width:70px;" value="${v.stock}" data-variant-id="${v.id}">
+        </div>
+      </div>
+    `).join("");
+
+    new bootstrap.Modal(document.getElementById("editProductModal")).show();
+  } catch (e) {
+    SH.toast(e.message, "error");
+  }
+}
+
+document.getElementById("ep-save").addEventListener("click", async () => {
+  try {
+    await SH.api(`/api/admin/products/${editingProductId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: document.getElementById("ep-name").value.trim(),
+        description: document.getElementById("ep-description").value.trim(),
+        price: parseFloat(document.getElementById("ep-price").value),
+        discount_price: document.getElementById("ep-discount-price").value ? parseFloat(document.getElementById("ep-discount-price").value) : null,
+        is_active: document.getElementById("ep-active").checked,
+        is_featured: document.getElementById("ep-featured").checked,
+        is_bestseller: document.getElementById("ep-bestseller").checked,
+      }),
+    });
+
+    const stockInputs = document.querySelectorAll(".ep-stock-input");
+    for (const input of stockInputs) {
+      await SH.api(`/api/admin/variants/${input.dataset.variantId}/stock?stock=${input.value}`, { method: "PUT" });
+    }
+
+    SH.toast("Product updated successfully!");
+    bootstrap.Modal.getInstance(document.getElementById("editProductModal")).hide();
+    loadAdminProducts();
+  } catch (e) {
+    SH.toast(e.message, "error");
+  }
+});
+
+loadAdminProducts();
+</script>
+{% endblock %}
